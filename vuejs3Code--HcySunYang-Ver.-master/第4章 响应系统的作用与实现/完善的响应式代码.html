@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <script>
+      let data = { aaa: 111 };
+      let activeEffect;
+      let bucket = new WeakMap();
+      function effect(fn) {
+        activeEffect = fn;
+
+        fn();
+      }
+
+      let obj = new Proxy(data, {
+        get(target, key, receiver) {
+          track(target, key);
+          return target[key];
+        },
+        set(target, key, receiver) {
+          // 设置属性值
+          target[key] = newVal;
+          // 把副作用函数从桶里取出并执行
+          trigger(target, key);
+        },
+      });
+
+      function track(target, key) {
+        if (!activeEffect) return target[key]; // 没有正在执行的副作用函数 直接返回
+        if (!bucket) {
+          return;
+        }
+        if (!bucket.has(target)) {
+          bucket.set(target, new Map());
+        }
+        let targetMap = bucket.get(target);
+        if (!targetMap.has(key)) {
+          targetMap.set(key, new Set());
+        }
+
+        let deps = targetMap.get(key);
+        deps.add(activeEffect);
+      }
+
+      function trigger(target, key) {
+        if (!bucket) {
+          return;
+        }
+        if (!bucket.has(target)) {
+          return;
+        }
+        let targetMap = bucket.get(target);
+        if (!targetMap.has(key)) {
+          return;
+        }
+        let deps = targetMap.get(key);
+        deps.forEach((effectFn) => {
+          effectFn();
+        });
+      }
+    </script>
+  </body>
+</html>
